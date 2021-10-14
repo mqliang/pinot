@@ -143,12 +143,12 @@ public interface BrokerResponse {
   List<QueryProcessingException> getProcessingExceptions();
 
   /**
-   * Get the total thread cpu time used against realtime table in request handling, into the broker response.
+   * Get the thread cpu time used against realtime table in request handling, from the broker response.
    */
   long getRealtimeThreadCpuTimeNs();
 
   /**
-   * Get the total thread cpu time used against offline table in request handling, into the broker response.
+   * Get the thread cpu time used against offline table in request handling, from the broker response.
    */
   long getOfflineThreadCpuTimeNs();
 
@@ -156,4 +156,44 @@ public interface BrokerResponse {
    * Get the total number of rows in result set
    */
   int getNumRowsResultSet();
+
+  /**
+   * Get the system activities cpu time used against offline table in request handling, from the broker response.
+   */
+  long getOfflineSystemActivitiesCpuTimeNs();
+
+  /**
+   * Set the system activities cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs);
+
+  /**
+   * Get the system activities cpu time used against realtime table in request handling, from the broker response.
+   */
+  long getRealtimeSystemActivitiesCpuTimeNs();
+
+  /**
+   * Set the system activities cpu time used against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs);
+
+  /**
+   * Get the response serialization cpu time used against offline table in request handling, from the broker response.
+   */
+  long getOfflineResponseSerializationCpuTimeNs();
+
+  /**
+   * Set the response serialization cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs);
+
+  /**
+   * Get the response serialization cpu time used against realtime table in request handling, from the broker response.
+   */
+  long getRealtimeResponseSerializationCpuTimeNs();
+
+  /**
+   * Set the response serialization cpu time used against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs);
 }

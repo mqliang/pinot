@@ -45,6 +45,43 @@ public class RequestStatistics {
   private long _numSegmentsMatched;
   private long _offlineThreadCpuTimeNs;
   private long _realtimeThreadCpuTimeNs;
+  private long _offlineSystemActivitiesCpuTimeNs;
+  private long _realtimeSystemActivitiesCpuTimeNs;
+  private long _offlineResponseSerializationCpuTimeNs;
+  private long _realtimeResponseSerializationCpuTimeNs;
+
+  public long getOfflineSystemActivitiesCpuTimeNs() {
+    return _offlineSystemActivitiesCpuTimeNs;
+  }
+
+  public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
+    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
+  }
+
+  public long getRealtimeSystemActivitiesCpuTimeNs() {
+    return _realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
+    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  public long getOfflineResponseSerializationCpuTimeNs() {
+    return _offlineResponseSerializationCpuTimeNs;
+  }
+
+  public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
+    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
+  }
+
+  public long getRealtimeResponseSerializationCpuTimeNs() {
+    return _realtimeResponseSerializationCpuTimeNs;
+  }
+
+  public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
+    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
+  }
+
   private int _numServersQueried;
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
@@ -123,6 +160,10 @@ public class RequestStatistics {
     _numExceptions = brokerResponse.getExceptionsSize();
     _offlineThreadCpuTimeNs = brokerResponse.getOfflineThreadCpuTimeNs();
     _realtimeThreadCpuTimeNs = brokerResponse.getRealtimeThreadCpuTimeNs();
+    _offlineSystemActivitiesCpuTimeNs = brokerResponse.getOfflineSystemActivitiesCpuTimeNs();
+    _realtimeSystemActivitiesCpuTimeNs = brokerResponse.getRealtimeSystemActivitiesCpuTimeNs();
+    _offlineResponseSerializationCpuTimeNs = brokerResponse.getOfflineResponseSerializationCpuTimeNs();
+    _realtimeResponseSerializationCpuTimeNs = brokerResponse.getRealtimeResponseSerializationCpuTimeNs();
     _numRowsResultSet = brokerResponse.getNumRowsResultSet();
   }
 

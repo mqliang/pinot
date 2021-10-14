@@ -131,6 +131,11 @@ public class BrokerReduceService {
     long numTotalDocs = 0L;
     long offlineThreadCpuTimeNs = 0L;
     long realtimeThreadCpuTimeNs = 0L;
+    long offlineSystemActivitiesCpuTimeNs = 0L;
+    long realtimeSystemActivitiesCpuTimeNs = 0L;
+    long offlineResponseSerializationCpuTimeNs = 0L;
+    long realtimeResponseSerializationCpuTimeNs = 0L;
+
     boolean numGroupsLimitReached = false;
 
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
@@ -208,6 +213,24 @@ public class BrokerReduceService {
         }
       }
 
+      String systemActivitiesCpuTimeNsString = metadata.get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName());
+      if (systemActivitiesCpuTimeNsString != null) {
+        if (entry.getKey().getTableType() == TableType.OFFLINE) {
+          offlineSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
+        } else {
+          realtimeSystemActivitiesCpuTimeNs += Long.parseLong(systemActivitiesCpuTimeNsString);
+        }
+      }
+
+      String responseSerializationCpuTimeNsString = metadata.get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
+      if (responseSerializationCpuTimeNsString != null) {
+        if (entry.getKey().getTableType() == TableType.OFFLINE) {
+          offlineResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
+        } else {
+          realtimeResponseSerializationCpuTimeNs += Long.parseLong(responseSerializationCpuTimeNsString);
+        }
+      }
+
       String numTotalDocsString = metadata.get(MetadataKey.TOTAL_DOCS.getName());
       if (numTotalDocsString != null) {
         numTotalDocs += Long.parseLong(numTotalDocsString);
@@ -242,6 +265,10 @@ public class BrokerReduceService {
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(offlineThreadCpuTimeNs);
     brokerResponseNative.setRealtimeThreadCpuTimeNs(realtimeThreadCpuTimeNs);
+    brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(offlineSystemActivitiesCpuTimeNs);
+    brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(realtimeSystemActivitiesCpuTimeNs);
+    brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(offlineResponseSerializationCpuTimeNs);
+    brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(realtimeResponseSerializationCpuTimeNs);
     if (numConsumingSegmentsProcessed > 0) {
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsProcessed);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
@@ -260,6 +287,15 @@ public class BrokerReduceService {
           TimeUnit.NANOSECONDS);
       brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs,
           TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          offlineSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          realtimeSystemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_RESPONSE_SER_CPU_TIME_NS,
+          offlineResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_RESPONSE_SER_CPU_TIME_NS,
+          realtimeResponseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);

@@ -43,7 +43,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "segmentStatistics", "traceInfo"
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "realtimeResponseSerializationCpuTimeNs", "segmentStatistics", "traceInfo"
 })
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
@@ -70,12 +72,14 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
+  private long _offlineSystemActivitiesCpuTimeNs = 0L;
+  private long _realtimeSystemActivitiesCpuTimeNs = 0L;
+  private long _offlineResponseSerializationCpuTimeNs = 0L;
+  private long _realtimeResponseSerializationCpuTimeNs = 0L;
   private int _numRowsResultSet = 0;
-
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
   private ResultTable _resultTable;
-
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
@@ -98,6 +102,59 @@ public class BrokerResponseNative implements BrokerResponse {
    */
   public static BrokerResponseNative empty() {
     return new BrokerResponseNative();
+  }
+
+  public static BrokerResponseNative fromJsonString(String jsonString)
+      throws IOException {
+    return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
+  }
+
+  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
+  @Override
+  public long getOfflineSystemActivitiesCpuTimeNs() {
+    return _offlineSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
+  @Override
+  public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
+    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
+  @Override
+  public long getRealtimeSystemActivitiesCpuTimeNs() {
+    return _realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
+  @Override
+  public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
+    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("offlineResponseSerializationCpuTimeNs")
+  @Override
+  public long getOfflineResponseSerializationCpuTimeNs() {
+    return _offlineResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("offlineResponseSerializationCpuTimeNs")
+  @Override
+  public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
+    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
+  @Override
+  public long getRealtimeResponseSerializationCpuTimeNs() {
+    return _realtimeResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
+  @Override
+  public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
+    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
   }
 
   @JsonProperty("selectionResults")
@@ -294,16 +351,16 @@ public class BrokerResponseNative implements BrokerResponse {
     return _offlineThreadCpuTimeNs;
   }
 
-  @JsonProperty("numRowsResultSet")
-  @Override
-  public int getNumRowsResultSet() {
-    return _numRowsResultSet;
-  }
-
   @JsonProperty("offlineThreadCpuTimeNs")
   @Override
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
     _offlineThreadCpuTimeNs = timeUsedMs;
+  }
+
+  @JsonProperty("numRowsResultSet")
+  @Override
+  public int getNumRowsResultSet() {
+    return _numRowsResultSet;
   }
 
   @JsonProperty("numRowsResultSet")
@@ -348,11 +405,6 @@ public class BrokerResponseNative implements BrokerResponse {
   public String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);
-  }
-
-  public static BrokerResponseNative fromJsonString(String jsonString)
-      throws IOException {
-    return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
   }
 
   @JsonIgnore

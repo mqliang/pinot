@@ -134,7 +134,11 @@ const responseStatCols = [
   'partialResponse',
   'minConsumingFreshnessTimeMs',
   'offlineThreadCpuTimeNs',
-  'realtimeThreadCpuTimeNs'
+  'realtimeThreadCpuTimeNs',
+  'offlineSystemActivitiesCpuTimeNs',
+  'realtimeSystemActivitiesCpuTimeNs',
+  'offlineResponseSerializationCpuTimeNs',
+  'realtimeResponseSerializationCpuTimeNs'
 ];
 
 const QueryPage = () => {
@@ -185,7 +189,7 @@ const QueryPage = () => {
   const handleOutputDataChange = (editor, data, value) => {
     setInputQuery(value);
   };
-  
+
   const handleQueryInterfaceKeyDown = (editor, event) => {
     // Map Cmd + Enter KeyPress to executing the query
     if (event.metaKey == true && event.keyCode == 13) {

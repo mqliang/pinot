@@ -188,6 +188,10 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
     long threadCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
+    long systemActivitiesCpuTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
+    long responseSerializationTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
 
     if (numDocsScanned > 0) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -210,6 +214,14 @@ public abstract class QueryScheduler {
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
           TimeUnit.NANOSECONDS);
     }
+    if (systemActivitiesCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          systemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+    }
+    if (responseSerializationTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RESPONSE_SER_CPU_TIME_NS,
+          responseSerializationTimeNs, TimeUnit.NANOSECONDS);
+    }
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
@@ -221,14 +233,15 @@ public abstract class QueryScheduler {
       LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
               + "minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},threadCpuTimeNs={}", requestId,
+              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
+              + "threadCpuTimeNs={},systemActivitiesCpuTimeNs={},responseSerializationTimeNs={}", requestId,
           tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
           schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          threadCpuTimeNs);
+          threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationTimeNs);
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
