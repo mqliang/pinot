@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.nio.file.Paths;
+import java.util.Random;
 import javax.annotation.concurrent.ThreadSafe;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
@@ -30,6 +33,118 @@ import xerial.larray.mmap.MMapMode;
 
 @ThreadSafe
 public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
+
+  private static final String RESOURCES_PATH =
+      Paths.get(".").toAbsolutePath().toString() + "/pinot-perf/src/main/resources/";
+  private static final File TEST_FILE = new File(RESOURCES_PATH + "PinotDataBufferTest.txt");
+  private static final long FILE_SIZE_GB = 125;
+  private static final int VALUE = Integer.MAX_VALUE;
+  private static final Random RANDOM = new Random();
+  private static final long FILE_SIZE_BYTES = FILE_SIZE_GB * 1024 * 1024 * 1024;
+  private static final long PAGE_SIZE_BYTES = 4 * 1024;
+  private static final long PAGE_NUM = FILE_SIZE_BYTES / PAGE_SIZE_BYTES;
+
+  public static void main(String[] args) throws IOException {
+    init();
+
+    long sequentialDenseReadStart = System.currentTimeMillis();
+    pinotDataBufferMMapSequentialDenseRead();
+    long sequentialDenseReadEnd = System.currentTimeMillis();
+    System.out.printf("Dense sequential read %d GB data: %s ms\n", FILE_SIZE_GB,
+        sequentialDenseReadEnd - sequentialDenseReadStart);
+
+    /*
+    long randomDenseReadStart = System.currentTimeMillis();
+    pinotDataBufferMMapRandomDenseRead();
+    long randomDenseReadEnd = System.currentTimeMillis();
+    System.out.printf("Dense random read %d GB data: %s ms\n", FILE_SIZE_GB, randomDenseReadEnd - randomDenseReadStart);
+     */
+
+    long sequentialSparseReadStart = System.currentTimeMillis();
+    pinotDataBufferMMapSequentialSparseRead();
+    long sequentialSparseReadEnd = System.currentTimeMillis();
+    System.out.printf("Sparse sequential read %d GB data: %s ms\n", FILE_SIZE_GB,
+        sequentialSparseReadEnd - sequentialSparseReadStart);
+
+    long randomSparseReadStart = System.currentTimeMillis();
+    pinotDataBufferMMapRandomSparseRead();
+    long randomSparseReadEnd = System.currentTimeMillis();
+    System.out
+        .printf("Sparse random read %d GB data: %s ms\n", FILE_SIZE_GB, randomSparseReadEnd - randomSparseReadStart);
+  }
+
+  // Sequentially read all the integers from the file
+  public static void pinotDataBufferMMapSequentialDenseRead()
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+      long totalNums = FILE_SIZE_BYTES / Integer.BYTES;
+      for (long i = 0; i < totalNums; i++) {
+        long offset = i * Integer.BYTES;
+        int actualValue = buffer.getInt(offset);
+        // Just in case of JVM optimizing `buffer.getInt(offset);`
+        Preconditions.checkState(actualValue == VALUE);
+      }
+    }
+  }
+
+  // Randomly read all the integers from the file
+  public static void pinotDataBufferMMapRandomDenseRead()
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+      long totalNums = FILE_SIZE_BYTES / Integer.BYTES;
+      for (long i = 0; i < totalNums; i++) {
+        long offset = (long) (RANDOM.nextFloat() * totalNums) * Integer.BYTES;
+        int actualValue = buffer.getInt(offset);
+        // Just in case of JVM optimizing `buffer.getInt(offset);`
+        Preconditions.checkState(actualValue == VALUE);
+      }
+    }
+  }
+
+  // Sequentially load all the 4k size pages from disk, for each page just read the first integer.
+  public static void pinotDataBufferMMapSequentialSparseRead()
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+      for (long i = 0; i < PAGE_NUM; i++) {
+        long offset = i * PAGE_SIZE_BYTES;
+        int actualValue = buffer.getInt(offset);
+        // Just in case of JVM optimizing `buffer.getInt(offset);`
+        Preconditions.checkState(actualValue == VALUE);
+      }
+    }
+  }
+
+  // Randomly load all the 4k size pages from disk, for each page just read the first integer.
+  public static void pinotDataBufferMMapRandomSparseRead()
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+      for (int i = 0; i < PAGE_NUM; i++) {
+        long offset = (long) (RANDOM.nextFloat() * PAGE_NUM) * PAGE_SIZE_BYTES;
+        int actualValue = buffer.getInt(offset);
+        // Just in case of JVM optimizing `buffer.getInt(offset);`
+        Preconditions.checkState(actualValue == VALUE);
+      }
+    }
+  }
+
+  // Create a file with given size on disk, and fill the file with Integer.MAX_VALUE
+  // NOTE: not use "randomAccessFile.setLength()" --> JVM/OS will create a sparse file
+  public static void init() {
+    if (!TEST_FILE.exists() || TEST_FILE.length() != FILE_SIZE_BYTES) {
+      System.out.println("Initialization start.");
+      try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+        long offset = 0;
+        while (offset != FILE_SIZE_BYTES) {
+          buffer.putInt(offset, VALUE);
+          offset += Integer.BYTES;
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
+    Preconditions.checkState(FILE_SIZE_BYTES == TEST_FILE.length());
+    System.out.println("Initialization completed.");
+  }
 
   static PinotNativeOrderLBuffer allocateDirect(long size) {
     LBufferAPI buffer = new LBuffer(size);
