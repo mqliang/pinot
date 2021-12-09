@@ -43,22 +43,25 @@ public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
   private static final long FILE_SIZE_BYTES = FILE_SIZE_GB * 1024 * 1024 * 1024;
   private static final long PAGE_SIZE_BYTES = 4 * 1024;
   private static final long PAGE_NUM = FILE_SIZE_BYTES / PAGE_SIZE_BYTES;
+  private static final int THREAD_NUM = 10;
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args)
+      throws IOException {
     init();
 
+    /*
     long sequentialDenseReadStart = System.currentTimeMillis();
     pinotDataBufferMMapSequentialDenseRead();
     long sequentialDenseReadEnd = System.currentTimeMillis();
     System.out.printf("Dense sequential read %d GB data: %s ms\n", FILE_SIZE_GB,
         sequentialDenseReadEnd - sequentialDenseReadStart);
 
-    /*
+
     long randomDenseReadStart = System.currentTimeMillis();
     pinotDataBufferMMapRandomDenseRead();
     long randomDenseReadEnd = System.currentTimeMillis();
     System.out.printf("Dense random read %d GB data: %s ms\n", FILE_SIZE_GB, randomDenseReadEnd - randomDenseReadStart);
-     */
+
 
     long sequentialSparseReadStart = System.currentTimeMillis();
     pinotDataBufferMMapSequentialSparseRead();
@@ -71,6 +74,13 @@ public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
     long randomSparseReadEnd = System.currentTimeMillis();
     System.out
         .printf("Sparse random read %d GB data: %s ms\n", FILE_SIZE_GB, randomSparseReadEnd - randomSparseReadStart);
+     */
+
+    long parallelSparseReadStart = System.currentTimeMillis();
+    pinotDataBufferMMapSequentialSparseReadMultiThread();
+    long parallelSparseReadEnd = System.currentTimeMillis();
+    System.out.printf("Sparse parallel (%d) sequential read %d GB data: %s ms\n", THREAD_NUM, FILE_SIZE_GB,
+        parallelSparseReadEnd - parallelSparseReadStart);
   }
 
   // Sequentially read all the integers from the file
@@ -124,6 +134,33 @@ public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
         // Just in case of JVM optimizing `buffer.getInt(offset);`
         Preconditions.checkState(actualValue == VALUE);
       }
+    }
+  }
+
+  // spawn 10 threads, each thread sequentially load all the 4k size pages for 1/10 of the file from disk, for each
+  // page just read the first integer.
+  public static void pinotDataBufferMMapSequentialSparseReadMultiThread()
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEST_FILE, false, 0, FILE_SIZE_BYTES)) {
+      long pageCntPerThread = PAGE_NUM / THREAD_NUM;
+      for (int i = 0; i < THREAD_NUM; i++) {
+        int threadID = i;
+        Runnable runnable = () -> {
+          long pageIdxStart = threadID * pageCntPerThread;
+          long pageIdxEnd = pageIdxStart + pageCntPerThread;
+          for (long pageIdx = pageIdxStart; pageIdx < pageIdxEnd; pageIdx++) {
+            long offset = pageIdx * PAGE_SIZE_BYTES;
+            int actualValue = buffer.getInt(offset);
+            // Just in case of JVM optimizing `buffer.getInt(offset);`
+            Preconditions.checkState(actualValue == VALUE);
+          }
+        };
+        Thread t = new Thread(runnable);
+        t.start();
+        t.join();
+      }
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
   }
 
