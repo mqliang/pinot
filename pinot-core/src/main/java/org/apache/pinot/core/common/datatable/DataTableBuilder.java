@@ -282,4 +282,131 @@ public class DataTableBuilder {
         : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
   }
+
+  public void setColumnValuesInBulk(DataSchema.ColumnDataType[] columnDataTypes, Object[] values)
+      throws IOException {
+    int numColumns = columnDataTypes.length;
+    for (int colId = 0; colId < numColumns; colId++) {
+      Object obj = values[colId];
+      switch (columnDataTypes[colId]) {
+        case INT: {
+          int value = (int) obj;
+          _currentRowDataByteBuffer.putInt(value);
+          break;
+        }
+        case LONG: {
+          long value = (long) obj;
+          _currentRowDataByteBuffer.putLong(value);
+          break;
+        }
+        case FLOAT: {
+          float value = (float) obj;
+          _currentRowDataByteBuffer.putFloat(value);
+          break;
+        }
+        case DOUBLE: {
+          double value = (double) obj;
+          _currentRowDataByteBuffer.putDouble(value);
+          break;
+        }
+        case STRING: {
+          String value = (String) obj;
+          String columnName = _dataSchema.getColumnName(colId);
+          Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
+          if (dictionary == null) {
+            dictionary = new HashMap<>();
+            _dictionaryMap.put(columnName, dictionary);
+            _reverseDictionaryMap.put(columnName, new HashMap<>());
+          }
+
+          _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+          Integer dictId = dictionary.get(value);
+          if (dictId == null) {
+            dictId = dictionary.size();
+            dictionary.put(value, dictId);
+            _reverseDictionaryMap.get(columnName).put(dictId, value);
+          }
+          _currentRowDataByteBuffer.putInt(dictId);
+          break;
+        }
+        case BYTES: {
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          byte[] bytes = (byte[]) obj;
+          _currentRowDataByteBuffer.putInt(bytes.length);
+          _variableSizeDataByteArrayOutputStream.write(bytes);
+          break;
+        }
+        case OBJECT: {
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(obj).getValue();
+          byte[] bytes = ObjectSerDeUtils.serialize(obj, objectTypeValue);
+          _currentRowDataByteBuffer.putInt(bytes.length);
+          _variableSizeDataOutputStream.writeInt(objectTypeValue);
+          _variableSizeDataByteArrayOutputStream.write(bytes);
+          break;
+        }
+        case INT_ARRAY: {
+          int[] intArray = (int[]) obj;
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          _currentRowDataByteBuffer.putInt(intArray.length);
+          for (int value : intArray) {
+            _variableSizeDataOutputStream.writeInt(value);
+          }
+          break;
+        }
+        case LONG_ARRAY: {
+          long[] longArray = (long[]) obj;
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          _currentRowDataByteBuffer.putInt(longArray.length);
+          for (long value : longArray) {
+            _variableSizeDataOutputStream.writeLong(value);
+          }
+          break;
+        }
+        case FLOAT_ARRAY: {
+          float[] floatArray = (float[]) obj;
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          _currentRowDataByteBuffer.putInt(floatArray.length);
+          for (float value : floatArray) {
+            _variableSizeDataOutputStream.writeFloat(value);
+          }
+          break;
+        }
+        case DOUBLE_ARRAY: {
+          double[] doubleArray = (double[]) obj;
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          _currentRowDataByteBuffer.putInt(doubleArray.length);
+          for (double value : doubleArray) {
+            _variableSizeDataOutputStream.writeDouble(value);
+          }
+          break;
+        }
+        case STRING_ARRAY: {
+          String[] stringArray = (String[]) obj;
+          _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+          _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+          _currentRowDataByteBuffer.putInt(values.length);
+
+          String columnName = _dataSchema.getColumnName(colId);
+          Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
+          if (dictionary == null) {
+            dictionary = new HashMap<>();
+            _dictionaryMap.put(columnName, dictionary);
+            _reverseDictionaryMap.put(columnName, new HashMap<>());
+          }
+
+          for (String value : stringArray) {
+            Integer dictId = dictionary.get(value);
+            if (dictId == null) {
+              dictId = dictionary.size();
+              dictionary.put(value, dictId);
+              _reverseDictionaryMap.get(columnName).put(dictId, value);
+            }
+            _variableSizeDataOutputStream.writeInt(dictId);
+          }
+        }
+      }
+    }
+  }
+
 }
