@@ -269,10 +269,14 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
 
-    // Maximum number of replicas in ideal state
-    int maxISReplicas = Integer.MIN_VALUE;
+    // Number of replicas in ideal state
+    int maxISImmutableReplicas = Integer.MIN_VALUE;
+    int maxISMutableReplicas = Integer.MIN_VALUE;
+
     // Minimum number of replicas in external view
-    int minEVReplicas = Integer.MAX_VALUE;
+    int minEVImmutableReplicas = Integer.MAX_VALUE;
+    int minEVMutableReplicas = Integer.MAX_VALUE;
+
     // Total compressed segment size in deep store
     long tableCompressedSize = 0;
     // Segments without ZK metadata
@@ -286,18 +290,21 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
     for (String segment : segments) {
-      int numISReplicas = 0;
+      int numISOnlineReplicas = 0;
+      int numISConsumingReplicas = 0;
       for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
         String state = entry.getValue();
-        if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-          numISReplicas++;
+        if (state.equals(SegmentStateModel.ONLINE)) {
+          numISOnlineReplicas++;
+        }
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          numISConsumingReplicas++;
         }
       }
-      // Skip segments not ONLINE/CONSUMING in ideal state
-      if (numISReplicas == 0) {
+      // Skip segments with no ONLINE/CONSUMING in ideal state
+      if (numISOnlineReplicas == 0 && numISConsumingReplicas == 0) {
         continue;
       }
-      maxISReplicas = Math.max(maxISReplicas, numISReplicas);
 
       SegmentZKMetadata segmentZKMetadata = _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segment);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
@@ -330,14 +337,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         }
       }
 
-      int numEVReplicas = 0;
+      int numEVOnlineReplicas = 0;
+      int numEVConsumingReplicas = 0;
       if (externalView != null) {
         Map<String, String> stateMap = externalView.getStateMap(segment);
         if (stateMap != null) {
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String state = entry.getValue();
-            if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-              numEVReplicas++;
+            if (state.equals(SegmentStateModel.ONLINE)) {
+              numEVOnlineReplicas++;
+            }
+            if (state.equals(SegmentStateModel.CONSUMING)) {
+              numEVConsumingReplicas++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
@@ -345,31 +356,39 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           }
         }
       }
-      if (numEVReplicas == 0) {
+      if (numEVOnlineReplicas == 0 && numEVConsumingReplicas == 0) {
         offlineSegments.add(segment);
-      } else if (numEVReplicas < numISReplicas) {
+      } else if (numEVOnlineReplicas + numEVConsumingReplicas < numISOnlineReplicas + numISConsumingReplicas) {
         partialOnlineSegments.add(segment);
-      } else {
-        // Do not allow nReplicasEV to be larger than nReplicasIS
-        numEVReplicas = numISReplicas;
       }
-      minEVReplicas = Math.min(minEVReplicas, numEVReplicas);
+
+      if (numEVConsumingReplicas == 0) { // it's a immutable segment
+        minEVImmutableReplicas = Math.min(minEVImmutableReplicas, numEVOnlineReplicas);
+      } else { // it's a mutable segment
+        minEVMutableReplicas = Math.min(minEVMutableReplicas, numEVOnlineReplicas + numEVConsumingReplicas);
+      }
     }
 
-    if (maxISReplicas == Integer.MIN_VALUE) {
-      try {
-        maxISReplicas = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
-      } catch (NumberFormatException e) {
-        maxISReplicas = 1;
-      }
+    if (maxISImmutableReplicas == Integer.MIN_VALUE) {
+      maxISImmutableReplicas = getMaxISImmutableReplicas(idealState);
     }
+    if (maxISMutableReplicas == Integer.MIN_VALUE) {
+      maxISMutableReplicas = getMaxISMutableReplicas(idealState, tableConfig);
+    }
+
     // Do not allow minEVReplicas to be larger than maxISReplicas
-    minEVReplicas = Math.min(minEVReplicas, maxISReplicas);
+    minEVImmutableReplicas = Math.min(minEVImmutableReplicas, maxISImmutableReplicas);
+    minEVMutableReplicas = Math.min(minEVMutableReplicas, maxISMutableReplicas);
 
-    if (minEVReplicas < maxISReplicas) {
-      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
-          tableNameWithType, minEVReplicas, maxISReplicas);
+    if (minEVImmutableReplicas < maxISImmutableReplicas) {
+      LOGGER.warn("Table {} has at least one immutable(offline/completed) segment running with only {} replicas, "
+              + "below replication threshold :{}", tableNameWithType, minEVImmutableReplicas, maxISImmutableReplicas);
     }
+    if (minEVMutableReplicas < maxISMutableReplicas) {
+      LOGGER.warn("Table {} has at least one mutable(consuming) segment running with only {} replicas, "
+              + "below replication threshold :{}", tableNameWithType, minEVMutableReplicas, maxISMutableReplicas);
+    }
+
     int numSegmentsWithoutZKMetadata = segmentsWithoutZKMetadata.size();
     if (numSegmentsWithoutZKMetadata > 0) {
       LOGGER.warn("Table {} has {} segments without ZK metadata: {}", tableNameWithType, numSegmentsWithoutZKMetadata,
@@ -402,9 +421,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS,
+        Math.min(minEVImmutableReplicas, minEVMutableReplicas)
+    );
+
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
-        minEVReplicas * 100L / maxISReplicas);
+            Math.min(minEVImmutableReplicas * 100L / maxISImmutableReplicas,
+                minEVMutableReplicas * 100L / maxISMutableReplicas)
+    );
+
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
@@ -424,6 +449,34 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
           streamConfig).findAndEmitMetrics(idealState);
     }
+  }
+
+  private static int getMaxISImmutableReplicas(IdealState idealState) {
+    try {
+      return Math.max(Integer.parseInt(idealState.getReplicas()), 1);
+    } catch (NumberFormatException e) {
+      return 1;
+    }
+  }
+
+  private static int getMaxISMutableReplicas(IdealState idealState, TableConfig config) {
+    int numConsumingReplicaGroups = 1;
+    int numOnlineReplicaGroups = 1;
+    int numISReplicas = 1;
+    try {
+      numISReplicas = Integer.parseInt(idealState.getReplicas());
+    } catch (NumberFormatException e) {
+      // ignore exceptions if the ideal state replica config is not present
+    }
+    try {
+      numConsumingReplicaGroups = config.getInstanceAssignmentConfigMap()
+          .get(SegmentStateModel.CONSUMING).getReplicaGroupPartitionConfig().getNumReplicaGroups();
+      numOnlineReplicaGroups = config.getInstanceAssignmentConfigMap()
+          .get(SegmentStateModel.ONLINE).getReplicaGroupPartitionConfig().getNumReplicaGroups();
+    } catch (NullPointerException e) {
+      // ignore exceptions if the instance assignment replica group config is not present
+    }
+    return Math.max(numISReplicas, Math.max(numConsumingReplicaGroups, numOnlineReplicaGroups));
   }
 
   private static String logSegments(List<?> segments) {
