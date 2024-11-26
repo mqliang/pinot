@@ -20,10 +20,16 @@ package org.apache.pinot.controller.helix;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.Gson;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -71,6 +77,144 @@ public class SegmentStatusCheckerTest {
   // Intentionally not reset the metrics to test all metrics being refreshed.
   private final ControllerMetrics _controllerMetrics =
       new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+
+  class JsonSegmentStatusInfo {
+    Map<String, Map<String, String>> OFFLINE;
+    Map<String, Map<String, String>> REALTIME;
+  }
+
+  @Test
+  public void mirrorInfiniteOfflineTest() throws FileNotFoundException {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("mirrorInfinite_OFFLINE").setNumReplicas(5).build();
+
+    Gson gson = new Gson();
+    IdealState idealState = new IdealState("mirrorInfinite_OFFLINE");
+    ExternalView externalView = new ExternalView("mirrorInfinite_OFFLINE");
+
+    JsonSegmentStatusInfo jsonIdealState = gson.fromJson(new FileReader("src/test/resources/mirrorInfinite/idealState.json"),
+        JsonSegmentStatusInfo.class);
+    for (Map.Entry<String, Map<String, String>> entry : jsonIdealState.OFFLINE.entrySet()) {
+      String partition = entry.getKey();
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        idealState.setPartitionState(partition, instanceState.getKey(), instanceState.getValue());
+      }
+    }
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    JsonSegmentStatusInfo jsonExternalView = gson.fromJson(new FileReader("src/test/resources/mirrorInfinite/externalView.json"),
+        JsonSegmentStatusInfo.class);
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.OFFLINE.entrySet()) {
+      String partition = entry.getKey();
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        externalView.setState(partition, instanceState.getKey(), instanceState.getValue());
+      }
+    }
+
+    Set<String> servers = new HashSet<>();
+    List<InstanceConfig> instanceConfigs = new LinkedList<>();
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.OFFLINE.entrySet()) {
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        String instanceId = instanceState.getKey();
+        if (!servers.contains(instanceId)) {
+          servers.add(instanceId);
+          instanceConfigs.add(newQuerableInstanceConfig(instanceId));
+        }
+      }
+    }
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.REALTIME.entrySet()) {
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        String instanceId = instanceState.getKey();
+        if (!servers.contains(instanceId)) {
+          servers.add(instanceId);
+          instanceConfigs.add(newQuerableInstanceConfig(instanceId));
+        }
+      }
+    }
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(instanceConfigs);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getAllTables()).thenReturn(List.of("mirrorInfinite_OFFLINE"));
+    when(resourceManager.getTableConfig("mirrorInfinite_OFFLINE")).thenReturn(tableConfig);
+    when(resourceManager.getTableIdealState("mirrorInfinite_OFFLINE")).thenReturn(idealState);
+    when(resourceManager.getTableExternalView("mirrorInfinite_OFFLINE")).thenReturn(externalView);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    long numOfReplicas = MetricValueUtils.getTableGaugeValue(_controllerMetrics, "mirrorInfinite_OFFLINE", ControllerGauge.NUMBER_OF_REPLICAS);
+    long percentOfReplicas = MetricValueUtils.getTableGaugeValue(_controllerMetrics, "mirrorInfinite_OFFLINE", ControllerGauge.PERCENT_OF_REPLICAS);
+    assertEquals(numOfReplicas, 5);
+    assertEquals(percentOfReplicas, 100);
+  }
+
+  @Test
+  public void mirrorInfiniteRealtimeTest() throws FileNotFoundException {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("mirrorInfinite_REALTIME").setNumReplicas(7).build();
+
+    Gson gson = new Gson();
+    IdealState idealState = new IdealState("mirrorInfinite_REALTIME");
+    ExternalView externalView = new ExternalView("mirrorInfinite_REALTIME");
+
+    JsonSegmentStatusInfo jsonIdealState = gson.fromJson(new FileReader("src/test/resources/mirrorInfinite/idealState.json"),
+        JsonSegmentStatusInfo.class);
+    for (Map.Entry<String, Map<String, String>> entry : jsonIdealState.REALTIME.entrySet()) {
+      String partition = entry.getKey();
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        idealState.setPartitionState(partition, instanceState.getKey(), instanceState.getValue());
+      }
+    }
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+
+    JsonSegmentStatusInfo jsonExternalView = gson.fromJson(new FileReader("src/test/resources/mirrorInfinite/externalView.json"),
+        JsonSegmentStatusInfo.class);
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.REALTIME.entrySet()) {
+      String partition = entry.getKey();
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        externalView.setState(partition, instanceState.getKey(), instanceState.getValue());
+      }
+    }
+
+    Set<String> servers = new HashSet<>();
+    List<InstanceConfig> instanceConfigs = new LinkedList<>();
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.OFFLINE.entrySet()) {
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        String instanceId = instanceState.getKey();
+        if (!servers.contains(instanceId)) {
+          servers.add(instanceId);
+          instanceConfigs.add(newQuerableInstanceConfig(instanceId));
+        }
+      }
+    }
+    for (Map.Entry<String, Map<String, String>> entry : jsonExternalView.REALTIME.entrySet()) {
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        String instanceId = instanceState.getKey();
+        if (!servers.contains(instanceId)) {
+          servers.add(instanceId);
+          instanceConfigs.add(newQuerableInstanceConfig(instanceId));
+        }
+      }
+    }
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(instanceConfigs);
+    when(resourceManager.getTableConfig("mirrorInfinite_OFFLINE")).thenReturn(tableConfig);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getAllTables()).thenReturn(List.of("mirrorInfinite_REALTIME"));
+    when(resourceManager.getTableIdealState("mirrorInfinite_REALTIME")).thenReturn(idealState);
+    when(resourceManager.getTableExternalView("mirrorInfinite_REALTIME")).thenReturn(externalView);
+
+
+    runSegmentStatusChecker(resourceManager, 0);
+    long numOfReplicas = MetricValueUtils.getTableGaugeValue(_controllerMetrics, "mirrorInfinite_REALTIME", ControllerGauge.NUMBER_OF_REPLICAS);
+    long percentOfReplicas = MetricValueUtils.getTableGaugeValue(_controllerMetrics, "mirrorInfinite_REALTIME", ControllerGauge.PERCENT_OF_REPLICAS);
+    assertEquals(numOfReplicas, 7);
+    assertEquals(percentOfReplicas, 100);
+  }
+
 
   @Test
   public void offlineBasicTest() {
