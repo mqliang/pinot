@@ -70,8 +70,6 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
   public static Meter _otelMeterProvider;
 
   public OpenTelemetryMetricsRegistry() {
-    init(OpenTelemetryHttpReporter.DEFAULT_HTTP_METRIC_EXPORTER,
-        OpenTelemetryHttpReporter.DEFAULT_EXPORT_INTERVAL_SECONDS);
   }
 
   public static void init(OtlpHttpMetricExporter otlpHttpMetricExporter, int exportIntervalInSeconds) {

@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.DoubleGauge;
 import io.opentelemetry.api.metrics.LongGauge;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
@@ -33,14 +34,25 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
+import static org.apache.pinot.spi.utils.CommonConstants.*;
+
 
 @AutoService(PinotMetricsFactory.class)
 @MetricsFactory
 public class OpenTelemetryMetricsFactory implements PinotMetricsFactory {
   private final PinotMetricsRegistry _pinotMetricsRegistry = new OpenTelemetryMetricsRegistry();
+  /** Headers to be passed while creating OpenTelemetry exporter */
+  private Map<String, String> _otelHeaders = new HashMap<>();
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
+    String otelHeadersString = metricsConfiguration.getProperty(OTEL_EXPORTER_OTLP_METRICS_HEADERS);
+    if (otelHeadersString != null) {
+      // Headers are passed as key=value pairs separated by '='. Multiple headers are separated by ','
+      // Currently supporting 1 header
+      String[] headers = otelHeadersString.split("=");
+      _otelHeaders.put(headers[0], headers[1]);
+    }
   }
 
   @Override
@@ -100,7 +112,7 @@ public class OpenTelemetryMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
-    return new OpenTelemetryHttpReporter();
+    return new OpenTelemetryHttpReporter(_otelHeaders);
   }
 
   @Override

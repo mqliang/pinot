@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.metrics.opentelemetry;
 
 import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
 import io.opentelemetry.sdk.metrics.export.AggregationTemporalitySelector;
+import java.util.Map;
 import org.apache.pinot.spi.metrics.PinotMetricReporter;
 
 
@@ -27,20 +28,24 @@ import org.apache.pinot.spi.metrics.PinotMetricReporter;
  * OpenTelemetryHttpReporter exports metrics to an OpenTelemetry collector on HTTP endpoint.
  */
 public class OpenTelemetryHttpReporter implements PinotMetricReporter {
-  public static final OtlpHttpMetricExporter DEFAULT_HTTP_METRIC_EXPORTER = OtlpHttpMetricExporter
-      .builder()
-      .setEndpoint("http://[::1]:22784/v1/metrics") // default OpenTelemetry collector endpoint
-      //.setEndpoint("http://127.0.0.1:4318/v1/metrics") // default OpenTelemetry collector endpoint
-      .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred())
-      .build();
+  public static final String DEFAULT_OTEL_COLLECTOR_ENDPOINT = "http://[::1]:22784/v1/metrics";
+  // public static final String DEFAULT_OTEL_COLLECTOR_ENDPOINT = "http://127.0.0.1:4318/v1/metrics";
   public static final int DEFAULT_EXPORT_INTERVAL_SECONDS = 1;
+  private final Map<String, String> _otelHeaders;
 
-  public OpenTelemetryHttpReporter() {
+  public OpenTelemetryHttpReporter(Map<String, String> otelHeaders) {
+    _otelHeaders = otelHeaders;
   }
 
   @Override
   public void start() {
-    // TODO: make the collector endpoint and export interval configurable
-    OpenTelemetryMetricsRegistry.init(DEFAULT_HTTP_METRIC_EXPORTER, DEFAULT_EXPORT_INTERVAL_SECONDS);
+    OtlpHttpMetricExporter httpMetricExporter = OtlpHttpMetricExporter
+        .builder()
+        .setEndpoint(DEFAULT_OTEL_COLLECTOR_ENDPOINT)
+        .setHeaders(() -> _otelHeaders)
+        .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred())
+        .build();
+
+    OpenTelemetryMetricsRegistry.init(httpMetricExporter, DEFAULT_EXPORT_INTERVAL_SECONDS);
   }
 }
