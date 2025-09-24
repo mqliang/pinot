@@ -215,6 +215,17 @@ public class PinotMetricUtils {
     return _pinotMetricsFactory.getPinotMetricsRegistry();
   }
 
+  /**
+   * Make a PinotMetricName for a simple (or global) metric without any attributes, so the simplifiedName is same as
+   * the fullName.
+   */
+  public static PinotMetricName makePinotMetricName(Class<?> klass, String fulName) {
+    return makePinotMetricName(klass, fulName, fulName, ImmutableMap.of());
+  }
+
+  /**
+   * Make a PinotMetricName for a metric with attributes.
+   */
   public static PinotMetricName makePinotMetricName(Class<?> klass, String fulName,
       String simplifiedName, Map<String, String> attributes) {
     return _pinotMetricsFactory.makePinotMetricName(klass, fulName, simplifiedName, attributes);
