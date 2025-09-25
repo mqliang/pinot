@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.hc.client5.http.impl.io.BasicHttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -104,14 +106,17 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
           });
         });
       }
+
       partitionToLagSet.forEach((partition, lagSet) -> {
-        _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
-            ControllerGauge.MAX_RECORDS_LAG, Collections.max(lagSet));
+        Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, partition);
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, partition,
+            ControllerGauge.MAX_RECORDS_LAG, Collections.max(lagSet), attributes);
       });
 
       partitionToAvailabilityLagSet.forEach((partition, lagSet) -> {
-        _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
-            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS, Collections.max(lagSet));
+        Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, partition);
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, partition,
+            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS, Collections.max(lagSet), attributes);
       });
     } catch (Exception e) {
       LOGGER.error("Failed to fetch consuming segments info. Unable to update table consumption status metrics");

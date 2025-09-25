@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.metrics.prometheus;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -143,7 +145,8 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
   }
 
   private void addPartitionGaugeWithLabels(ServerGauge serverGauge, String labels) {
-    _serverMetrics.setValueOfPartitionGauge(labels, 3, serverGauge, 100L);
+    _serverMetrics.setValueOfTableGauge(labels, String.valueOf(3), serverGauge, 100L,
+        ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, String.valueOf(3)));
   }
 
   public void addMeterWithLabels(ServerMeter serverMeter, String labels) {

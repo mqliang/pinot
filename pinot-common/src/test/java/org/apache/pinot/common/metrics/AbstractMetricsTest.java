@@ -20,6 +20,7 @@ package org.apache.pinot.common.metrics;
 
 import com.google.common.collect.ImmutableMap;
 import com.yammer.metrics.core.MetricName;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -446,11 +447,15 @@ public class AbstractMetricsTest {
     String table = "test_table";
     int partitionId = 1024;
 
-    controllerMetrics.setValueOfPartitionGauge(table, partitionId, ControllerGauge.VERSION, 1L);
+    Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID,
+        String.valueOf(partitionId));
+    controllerMetrics.setValueOfTableGauge(table, String.valueOf(partitionId), ControllerGauge.VERSION,
+        1L, attributes);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 1);
 
-    controllerMetrics.setOrUpdatePartitionGauge(table, partitionId, ControllerGauge.VERSION, () -> 2L);
+    controllerMetrics.setValueOfTableGauge(table, String.valueOf(partitionId), ControllerGauge.VERSION, 2L,
+        attributes);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 2);
 

@@ -27,6 +27,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -159,7 +160,8 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
       }
     } else {
       if (GAUGES_ACCEPTING_PARTITION.contains(controllerGauge)) {
-        _controllerMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 3, controllerGauge, 10L);
+        _controllerMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, String.valueOf(3), controllerGauge, 10L,
+            ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, String.valueOf(3)));
         String strippedGaugeName = getStrippedMetricName(controllerGauge);
         assertGaugeExportedCorrectly(strippedGaugeName, ExportedLabels.PARTITION_TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);

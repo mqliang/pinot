@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -413,8 +415,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected abstract long getNumPrimaryKeys();
 
   protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        numPrimaryKeys);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, String.valueOf(_partitionId), ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys, ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, String.valueOf(_partitionId)));
   }
 
   protected void updatePrimaryKeyGauge() {

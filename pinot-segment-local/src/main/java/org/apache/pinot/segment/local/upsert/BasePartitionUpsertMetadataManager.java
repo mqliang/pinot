@@ -382,8 +382,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract long getNumPrimaryKeys();
 
   protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
-        numPrimaryKeys);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, String.valueOf(_partitionId), ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys, ImmutableMap.of(MetricAttributeConstants.STREAM_PARTITION_ID, String.valueOf(_partitionId))
+    );
   }
 
   protected void updatePrimaryKeyGauge() {
@@ -942,10 +943,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (isTTLEnabled()) {
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
+
+    Map<String, String> attributes = ImmutableMap.of(
+        MetricAttributeConstants.STREAM_PARTITION_ID, String.valueOf(_partitionId));
+
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, String.valueOf(_partitionId),
+        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments, attributes);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, String.valueOf(_partitionId),
+        ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot, attributes);
     int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
