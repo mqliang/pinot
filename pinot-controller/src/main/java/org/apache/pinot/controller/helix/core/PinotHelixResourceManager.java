@@ -119,6 +119,8 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest.LineageUpdatePriority;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
@@ -3972,6 +3974,12 @@ public class PinotHelixResourceManager {
             // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
             //    at any time in case of REFRESH use case.
             if (forceCleanup) {
+              if (!canApplyForceCleanup(segmentLineage.getCustomMap(), customMap)) {
+                throw new IllegalStateException(
+                    "Detected the incomplete lineage entry with higher priority. Force cleanup cannot be applied. "
+                        + "tableNameWithType=" + tableNameWithType + ", entryId=" + entryId + ", entryCustomMap="
+                        + segmentLineage.getCustomMap() + ", currentAttemptCustomMap=" + customMap);
+              }
               if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
                   !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
                       segmentsTo, lineageEntry.getSegmentsTo()))) {
@@ -4705,6 +4713,33 @@ public class PinotHelixResourceManager {
 
   public void setQueryWorkloadManager(QueryWorkloadManager queryWorkloadManager) {
     _queryWorkloadManager = queryWorkloadManager;
+  }
+
+  private boolean canApplyForceCleanup(Map<String, String> prevLineageCustomMap,
+      Map<String, String> currLineageCustomMap) {
+    LineageUpdatePriority prevLineageUpdatePriority = getLineageUpdatePriorityFromCustomMap(prevLineageCustomMap);
+    LineageUpdatePriority currLineageUpdatePriority = getLineageUpdatePriorityFromCustomMap(currLineageCustomMap);
+
+    switch (currLineageUpdatePriority) {
+      case P0:
+        return true;
+      case P1:
+        return prevLineageUpdatePriority != LineageUpdatePriority.P0;
+      case P2:
+        return prevLineageUpdatePriority == LineageUpdatePriority.P2;
+      default:
+        return false;
+    }
+  }
+
+  private LineageUpdatePriority getLineageUpdatePriorityFromCustomMap(Map<String, String> lineageCustomMap) {
+    if (lineageCustomMap == null) {
+      return LineageUpdatePriority.P2;
+    }
+    return LineageUpdatePriority.valueOf(
+        lineageCustomMap.getOrDefault(StartReplaceSegmentsRequest.LINEAGE_UPDATE_PRIORITY_KEY,
+            LineageUpdatePriority.P2.name())
+    );
   }
 
   /*

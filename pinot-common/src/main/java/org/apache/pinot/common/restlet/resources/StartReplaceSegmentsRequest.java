@@ -40,6 +40,12 @@ public class StartReplaceSegmentsRequest {
   private final List<String> _segmentsTo;
   private final Map<String, String> _customMap;
 
+  public enum LineageUpdatePriority {
+    P0, P1, P2;
+  }
+
+  public static final String LINEAGE_UPDATE_PRIORITY_KEY = "LineageUpdatePriority";
+
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo) {
     this(segmentsFrom, segmentsTo, null);

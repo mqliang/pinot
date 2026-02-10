@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest.LineageUpdatePriority;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -150,9 +152,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<String> segmentsTo =
           context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
               .collect(Collectors.toList());
+      // Pinot minion task should have low priority in the lineage entry to avoid blocking other critical lineage
+      // updates, such as segment refresh triggered by pinot build and push job.
+      Map<String, String> customMap = ImmutableMap.of(
+          StartReplaceSegmentsRequest.LINEAGE_UPDATE_PRIORITY_KEY, LineageUpdatePriority.P2.name()
+      );
       String lineageEntryId =
           SegmentConversionUtils.startSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
-              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthProvider());
+              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo, customMap), context.getAuthProvider());
       context.setCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID, lineageEntryId);
     }
   }
