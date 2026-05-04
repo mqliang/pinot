@@ -52,6 +52,14 @@ public class StartReplaceSegmentsRequest {
   @JsonCreator
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
+      @JsonProperty("customMap") @Nullable Map<String, String> customMap
+  ) {
+    this(segmentsFrom, segmentsTo, customMap, LineageEntryPriority.DEFAULT_LINEAGE_PRIORITY);
+  }
+
+  @JsonCreator
+  public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
+      @JsonProperty("segmentsTo") @Nullable List<String> segmentsTo,
       @JsonProperty("customMap") @Nullable Map<String, String> customMap,
       @JsonProperty("priority") @Nullable Integer priority) {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
